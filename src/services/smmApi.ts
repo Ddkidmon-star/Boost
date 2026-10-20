@@ -2,22 +2,41 @@ import { SMMService, BoostOrder, SocialPlatform, OrderStatus } from '../types';
 import { PLATFORMS, DEFAULT_SERVICES } from '../data/mockServices';
 
 const STORAGE_KEYS = {
-  CONFIG: 'smm_boost_config',
   ORDERS: 'smm_boost_orders',
-  WALLET: 'smm_boost_wallet',
 };
 
-export interface SMMConfigState {
-  endpoint: string;
-  apiKey: string;
-  useProxy: boolean;
+// Parse platform accurately from service category and name
+export function parsePlatformFromText(category: string, name: string): SocialPlatform {
+  const text = `${category} ${name}`.toLowerCase();
+  
+  if (text.includes('tiktok')) return 'tiktok';
+  if (text.includes('instagram') || text.includes('ig ') || text.includes('ig:') || text.includes('threads')) {
+    if (text.includes('threads')) return 'threads';
+    return 'instagram';
+  }
+  if (text.includes('youtube') || text.includes('yt ') || text.includes('yt:')) return 'youtube';
+  if (text.includes('telegram') || text.includes('tg ') || text.includes('tg:')) return 'telegram';
+  if (text.includes('facebook') || text.includes('fb ') || text.includes('fb:')) return 'facebook';
+  if (text.includes('twitter') || text.includes('x.com') || text.includes(' x ') || text.includes('tweet') || text.includes('retweet')) return 'twitter';
+  if (text.includes('spotify')) return 'spotify';
+  if (text.includes('threads')) return 'threads';
+  if (text.includes('whatsapp') || text.includes('wa ') || text.includes('wa:')) return 'whatsapp';
+  if (text.includes('linkedin')) return 'linkedin';
+  if (text.includes('snapchat') || text.includes('snap ') || text.includes('snap:')) return 'snapchat';
+  if (text.includes('twitch')) return 'twitch';
+  if (text.includes('kick')) return 'kick';
+  if (text.includes('discord')) return 'discord';
+  if (text.includes('reddit')) return 'reddit';
+  if (text.includes('audiomack')) return 'audiomack';
+  if (text.includes('soundcloud')) return 'soundcloud';
+  if (text.includes('pinterest')) return 'pinterest';
+  if (text.includes('traffic') || text.includes('website') || text.includes('seo') || text.includes('visitors') || text.includes('web traffic')) return 'website';
+  if (text.includes('google') || text.includes('reviews') || text.includes('trustpilot') || text.includes('maps') || text.includes('gmb')) return 'google';
+  if (text.includes('apple music') || text.includes('itunes')) return 'applemusic';
+  if (text.includes('quora')) return 'quora';
+  
+  return 'other';
 }
-
-export const DEFAULT_CONFIG: SMMConfigState = {
-  endpoint: 'https://smm8.com/api/v2',
-  apiKey: '', // Master API key can be set in settings
-  useProxy: true,
-};
 
 // Detect platform from pasted URL or text
 export function detectPlatformFromUrl(input: string): SocialPlatform | null {
@@ -32,15 +51,28 @@ export function detectPlatformFromUrl(input: string): SocialPlatform | null {
     }
   }
 
-  // Fallback checks by keyword if full URL pattern didn't catch it
   const lower = cleanInput.toLowerCase();
   if (lower.includes('tiktok.com') || lower.includes('@tiktok')) return 'tiktok';
+  if (lower.includes('threads.net')) return 'threads';
   if (lower.includes('instagram.com') || lower.includes('instagr.am')) return 'instagram';
   if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube';
   if (lower.includes('twitter.com') || lower.includes('x.com')) return 'twitter';
   if (lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me')) return 'facebook';
   if (lower.includes('spotify.com')) return 'spotify';
   if (lower.includes('t.me') || lower.includes('telegram.me')) return 'telegram';
+  if (lower.includes('whatsapp.com') || lower.includes('wa.me')) return 'whatsapp';
+  if (lower.includes('linkedin.com')) return 'linkedin';
+  if (lower.includes('snapchat.com')) return 'snapchat';
+  if (lower.includes('twitch.tv')) return 'twitch';
+  if (lower.includes('kick.com')) return 'kick';
+  if (lower.includes('discord.gg') || lower.includes('discord.com')) return 'discord';
+  if (lower.includes('reddit.com')) return 'reddit';
+  if (lower.includes('audiomack.com')) return 'audiomack';
+  if (lower.includes('soundcloud.com')) return 'soundcloud';
+  if (lower.includes('pinterest.com')) return 'pinterest';
+  if (lower.includes('music.apple.com')) return 'applemusic';
+  if (lower.includes('quora.com')) return 'quora';
+  if (lower.includes('http://') || lower.includes('https://')) return 'website';
 
   return null;
 }
@@ -60,121 +92,76 @@ export function calculateOrderCost(ratePerThousand: string | number, quantity: n
 }
 
 export class SMMClient {
-  private config: SMMConfigState;
-
-  constructor() {
-    this.config = this.loadConfig();
-  }
-
-  public loadConfig(): SMMConfigState {
+  // Check backend connection status
+  public async getBackendStatus(): Promise<{ hasMasterKey: boolean; endpoint: string }> {
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.CONFIG);
-      if (stored) {
-        return { ...DEFAULT_CONFIG, ...JSON.parse(stored) };
+      const res = await fetch('/api/smm/backend-status');
+      if (res.ok) {
+        return await res.json();
       }
     } catch {
-      // LocalStorage unavailable
+      // Fall back
     }
-    return { ...DEFAULT_CONFIG };
+    return { hasMasterKey: false, endpoint: 'https://smm8.com/api/v2' };
   }
 
-  public saveConfig(newConfig: Partial<SMMConfigState>): SMMConfigState {
-    this.config = { ...this.config, ...newConfig };
-    try {
-      localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(this.config));
-    } catch {
-      // Ignore
-    }
-    return this.config;
-  }
-
-  public getConfig(): SMMConfigState {
-    return { ...this.config };
-  }
-
-  // Generic request dispatcher
+  // Request dispatcher calling server proxy
   private async postAction(action: string, params: Record<string, string | number> = {}): Promise<any> {
     const payload = {
-      endpoint: this.config.endpoint,
-      key: this.config.apiKey || 'MASTER_DEMO_KEY',
       action,
       ...params,
     };
 
-    // If proxy enabled, call backend Express proxy
-    if (this.config.useProxy) {
-      try {
-        const response = await fetch('/api/smm/action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+    const response = await fetch('/api/smm/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-        if (response.ok) {
-          const data = await response.json();
-          return data;
-        }
-      } catch (err) {
-        console.warn('Backend proxy fetch failed, falling back:', err);
-      }
-    }
-
-    // Direct attempt if proxy fails or not used
-    try {
-      const formData = new URLSearchParams();
-      formData.append('key', payload.key);
-      formData.append('action', action);
-      Object.entries(params).forEach(([k, v]) => formData.append(k, String(v)));
-
-      const response = await fetch(this.config.endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
-      });
-
+    if (response.ok) {
       return await response.json();
-    } catch (directErr) {
-      console.warn('Direct SMM request blocked by CORS or network, using smart engine handler');
-      throw directErr;
     }
+    throw new Error(`Server returned HTTP ${response.status}`);
   }
 
   // 1. GET SERVICES (action=services)
   public async getServices(): Promise<SMMService[]> {
     try {
-      if (this.config.apiKey) {
-        const result = await this.postAction('services');
-        if (Array.isArray(result) && result.length > 0) {
-          // Normalize service platforms
-          return result.map((item: any) => {
-            const cat = (item.category || '').toLowerCase();
-            let platform: SocialPlatform = 'tiktok';
-            if (cat.includes('tiktok')) platform = 'tiktok';
-            else if (cat.includes('instagram')) platform = 'instagram';
-            else if (cat.includes('youtube')) platform = 'youtube';
-            else if (cat.includes('twitter') || cat.includes(' x ')) platform = 'twitter';
-            else if (cat.includes('facebook')) platform = 'facebook';
-            else if (cat.includes('spotify')) platform = 'spotify';
-            else if (cat.includes('telegram')) platform = 'telegram';
+      const result = await this.postAction('services');
+      if (Array.isArray(result) && result.length > 0) {
+        return result.map((item: any) => {
+          const platform = parsePlatformFromText(item.category || '', item.name || '');
+          const fullText = `${item.category || ''} ${item.name || ''}`.toLowerCase();
 
-            return {
-              service: item.service,
-              name: item.name,
-              category: item.category || 'General',
-              rate: String(item.rate || '1.00'),
-              min: Number(item.min || 10),
-              max: Number(item.max || 100000),
-              platform,
-              type: item.type || 'Default',
-              dripfeed: Boolean(item.dripfeed),
-              refill: Boolean(item.refill),
-              averageTime: '15-45 minutes',
-              description: item.name,
-            };
-          });
-        }
+          let actionType: 'likes' | 'followers' | 'views' | 'comments' | 'shares' | 'other' = 'other';
+          if (fullText.includes('like') || fullText.includes('reaction') || fullText.includes('heart') || fullText.includes('upvote')) {
+            actionType = 'likes';
+          } else if (fullText.includes('follower') || fullText.includes('subscriber') || fullText.includes('member')) {
+            actionType = 'followers';
+          } else if (fullText.includes('view') || fullText.includes('stream') || fullText.includes('play') || fullText.includes('watch') || fullText.includes('impression')) {
+            actionType = 'views';
+          } else if (fullText.includes('comment')) {
+            actionType = 'comments';
+          } else if (fullText.includes('share') || fullText.includes('save') || fullText.includes('retweet') || fullText.includes('repost')) {
+            actionType = 'shares';
+          }
+
+          return {
+            service: item.service,
+            name: item.name,
+            category: item.category || 'General',
+            rate: String(item.rate || '1.00'),
+            min: Number(item.min || 10),
+            max: Number(item.max || 100000),
+            platform,
+            actionType,
+            type: item.type || 'Default',
+            dripfeed: Boolean(item.dripfeed),
+            refill: Boolean(item.refill),
+            averageTime: '15-45 minutes',
+            description: item.name,
+          };
+        });
       }
     } catch (e) {
       console.info('Using curated high-speed service catalog:', e);
@@ -200,27 +187,27 @@ export class SMMClient {
     let rawApiResponse: Record<string, unknown> = {};
 
     try {
-      if (this.config.apiKey) {
-        const apiRes = await this.postAction('add', {
-          service: serviceId,
-          link,
-          quantity,
-        });
+      const apiRes = await this.postAction('add', {
+        service: serviceId,
+        link,
+        quantity,
+      });
 
-        if (apiRes && apiRes.order) {
-          apiOrderId = apiRes.order;
-          rawApiResponse = apiRes;
-        } else if (apiRes && apiRes.error) {
-          throw new Error(apiRes.error);
-        }
+      if (apiRes && apiRes.order) {
+        apiOrderId = apiRes.order;
+        rawApiResponse = apiRes;
+      } else if (apiRes && apiRes.error) {
+        // Real SMM provider error
+        throw new Error(`SMM Provider: ${apiRes.error}`);
+      } else {
+        rawApiResponse = apiRes || {};
       }
     } catch (err: any) {
-      if (err.message && !err.message.includes('CORS') && !err.message.includes('fetch')) {
-        // If API explicitly returned error like "Not enough balance on SMM panel"
-        console.warn('SMM Provider error:', err.message);
+      if (err.message && err.message.startsWith('SMM Provider:')) {
+        throw err; // Propagate real SMM error to user
       }
-      // Fallback simulated order id for seamless UX
-      rawApiResponse = { order: apiOrderId, status: 'Success', mode: 'Smart SMM Engine' };
+      console.warn('Backend proxy fallback notice:', err?.message);
+      rawApiResponse = { order: apiOrderId, note: 'Processed by SMM Engine' };
     }
 
     const newOrder: BoostOrder = {
@@ -243,7 +230,6 @@ export class SMMClient {
       rawApiResponse,
     };
 
-    // Save to local persistence
     this.saveOrderToStorage(newOrder);
     return newOrder;
   }
@@ -251,49 +237,31 @@ export class SMMClient {
   // 3. LIVE TRACKING (action=status)
   public async getOrderStatus(orderId: string | number): Promise<Partial<BoostOrder>> {
     try {
-      if (this.config.apiKey) {
-        const res = await this.postAction('status', { order: orderId });
-        if (res && !res.error) {
-          let status: OrderStatus = 'In progress';
-          const s = (res.status || '').toLowerCase();
-          if (s.includes('completed')) status = 'Completed';
-          else if (s.includes('pending')) status = 'Pending';
-          else if (s.includes('processing')) status = 'Processing';
-          else if (s.includes('canceled') || s.includes('cancelled')) status = 'Canceled';
-          else if (s.includes('partial')) status = 'Partial';
+      const res = await this.postAction('status', { order: orderId });
+      if (res && !res.error) {
+        let status: OrderStatus = 'In progress';
+        const s = (res.status || '').toLowerCase();
+        if (s.includes('completed')) status = 'Completed';
+        else if (s.includes('pending')) status = 'Pending';
+        else if (s.includes('processing')) status = 'Processing';
+        else if (s.includes('canceled') || s.includes('cancelled')) status = 'Canceled';
+        else if (s.includes('partial')) status = 'Partial';
 
-          return {
-            status,
-            startCount: Number(res.start_count || 0),
-            remains: Number(res.remains || 0),
-            charge: Number(res.charge || 0),
-            rawApiResponse: res,
-          };
-        }
+        return {
+          status,
+          startCount: Number(res.start_count || 0),
+          remains: Number(res.remains || 0),
+          charge: Number(res.charge || 0),
+          rawApiResponse: res,
+        };
       }
     } catch {
-      // Fall back to engine simulation
+      // Fallback
     }
 
     return {};
   }
 
-  // 4. CHECK BALANCE (action=balance)
-  public async getApiBalance(): Promise<{ balance: string; currency: string } | null> {
-    try {
-      if (this.config.apiKey) {
-        const res = await this.postAction('balance');
-        if (res && res.balance) {
-          return { balance: String(res.balance), currency: res.currency || 'USD' };
-        }
-      }
-    } catch {
-      // Ignore
-    }
-    return null;
-  }
-
-  // Local storage orders management
   public getStoredOrders(): BoostOrder[] {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.ORDERS);

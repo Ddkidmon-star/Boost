@@ -6,9 +6,8 @@ import {
   signOut, 
   syncUserProfile, 
   updateUserBalanceInDb, 
-  isOwnerEmail, 
-  testFirestoreConnection,
-  OWNER_EMAIL 
+  verifyUserRoleOnBackend, 
+  testFirestoreConnection 
 } from '../services/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
@@ -18,6 +17,7 @@ interface AuthContextType {
   isOwner: boolean;
   isLoading: boolean;
   loginWithGoogle: () => Promise<void>;
+  loginAsRegular: () => void;
   logout: () => Promise<void>;
   topUpWallet: (amount: number) => Promise<void>;
   deductBalance: (amount: number) => Promise<boolean>;
@@ -44,11 +44,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(profile);
         } catch (err) {
           console.warn('Profile sync fallback:', err);
-          const isOwner = isOwnerEmail(currentFirebaseUser.email);
+          const isOwner = await verifyUserRoleOnBackend(currentFirebaseUser.email);
           setUser({
             uid: currentFirebaseUser.uid,
             email: currentFirebaseUser.email || '',
-            displayName: currentFirebaseUser.displayName || (isOwner ? 'Precious' : 'User'),
+            displayName: currentFirebaseUser.displayName || (isOwner ? 'VIP Owner' : 'Customer Account'),
             photoURL: currentFirebaseUser.photoURL || undefined,
             isOwner,
             balance: isOwner ? Infinity : 20.00,
@@ -75,6 +75,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loginAsRegular = () => {
+    setUser({
+      uid: 'demo_user_uid',
+      email: 'client@boostpro.app',
+      displayName: 'Customer Account',
+      photoURL: undefined,
+      isOwner: false,
+      balance: 35.00,
+      createdAt: new Date().toISOString(),
+    });
   };
 
   const logout = async () => {
@@ -126,6 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isOwner: Boolean(user?.isOwner),
         isLoading,
         loginWithGoogle,
+        loginAsRegular,
         logout,
         topUpWallet,
         deductBalance,

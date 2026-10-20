@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { SMMService, BoostOrder, SocialPlatform, OrderStatus } from '../types';
-import { smmClient, SMMConfigState } from '../services/smmApi';
+import { smmClient } from '../services/smmApi';
 import { DEFAULT_SERVICES } from '../data/mockServices';
 import { useAuth } from './AuthContext';
 import { 
@@ -23,8 +23,6 @@ interface SMMContextType {
   placeOrder: (serviceId: string | number, link: string, quantity: number) => Promise<{ success: boolean; order?: BoostOrder; error?: string }>;
   refreshOrderStatus: (orderId: string) => Promise<void>;
   refreshAllOrders: () => Promise<void>;
-  config: SMMConfigState;
-  updateConfig: (newConfig: Partial<SMMConfigState>) => void;
   autoRefresh: boolean;
   setAutoRefresh: (val: boolean) => void;
 }
@@ -40,27 +38,24 @@ export const SMMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [preselectedServiceId, setPreselectedServiceId] = useState<string | number | null>(null);
-  const [config, setConfig] = useState<SMMConfigState>(smmClient.getConfig());
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   // 1. Subscribe to real Firestore orders when authenticated
   useEffect(() => {
     if (!user?.uid) {
-      // If not logged in, load local cache
       const stored = smmClient.getStoredOrders();
       setOrders(stored);
       return;
     }
 
-    // Real-time Firestore sync
-    const unsubscribe = subscribeToUserOrders(user.uid, user.email, (liveOrders) => {
+    const unsubscribe = subscribeToUserOrders(user.uid, isOwner, (liveOrders) => {
       setOrders(liveOrders);
     });
 
     return () => unsubscribe();
-  }, [user?.uid, user?.email]);
+  }, [user?.uid, isOwner]);
 
-  // 2. Load services from SMM engine
+  // 2. Load services from backend SMM relay
   useEffect(() => {
     setIsLoadingServices(true);
     smmClient.getServices().then((fetched) => {
@@ -202,14 +197,6 @@ export const SMMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateConfig = (newCfg: Partial<SMMConfigState>) => {
-    const updated = smmClient.saveConfig(newCfg);
-    setConfig(updated);
-    smmClient.getServices().then((fetched) => {
-      if (fetched && fetched.length > 0) setServices(fetched);
-    });
-  };
-
   return (
     <SMMContext.Provider
       value={{
@@ -226,8 +213,6 @@ export const SMMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         placeOrder,
         refreshOrderStatus,
         refreshAllOrders,
-        config,
-        updateConfig,
         autoRefresh,
         setAutoRefresh,
       }}

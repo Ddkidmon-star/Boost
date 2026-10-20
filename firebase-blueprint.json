@@ -38,6 +38,16 @@
         "updatedAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["userId", "serviceId", "link", "quantity", "status", "createdAt"]
+    },
+    "SMMConfig": {
+      "title": "SMMConfig",
+      "description": "Master SMM Panel v2 configuration and API key",
+      "type": "object",
+      "properties": {
+        "endpoint": { "type": "string", "maxLength": 512 },
+        "apiKey": { "type": "string", "maxLength": 512 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      }
     }
   },
   "firestore": {
@@ -48,6 +58,10 @@
     "/orders/{orderId}": {
       "schema": "BoostOrder",
       "description": "Boost orders placed by authenticated users"
+    },
+    "/settings/{settingId}": {
+      "schema": "SMMConfig",
+      "description": "Global SMM engine configuration accessible by owner"
     }
   }
 }

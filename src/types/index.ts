@@ -4,8 +4,24 @@ export type SocialPlatform =
   | 'youtube'
   | 'twitter'
   | 'facebook'
+  | 'telegram'
   | 'spotify'
-  | 'telegram';
+  | 'website'
+  | 'threads'
+  | 'whatsapp'
+  | 'linkedin'
+  | 'snapchat'
+  | 'twitch'
+  | 'kick'
+  | 'discord'
+  | 'reddit'
+  | 'audiomack'
+  | 'soundcloud'
+  | 'pinterest'
+  | 'google'
+  | 'applemusic'
+  | 'quora'
+  | 'other';
 
 export interface SMMService {
   service: string | number; // e.g. "101", 101
@@ -15,6 +31,7 @@ export interface SMMService {
   min: string | number;
   max: string | number;
   platform: SocialPlatform;
+  actionType?: 'likes' | 'followers' | 'views' | 'comments' | 'shares' | 'other';
   type?: 'Default' | 'Custom Comments' | 'Package' | 'Subscriptions';
   dripfeed?: boolean;
   refill?: boolean;
@@ -40,11 +57,12 @@ export interface BoostOrder {
   platform: SocialPlatform;
   link: string;
   quantity: number;
-  charge: number; // 0.00 for Owner Preciousddkid@gmail.com
+  charge: number; // 0.00 for Owner accounts
   status: OrderStatus;
   startCount: number;
   remains: number;
   currency: string;
+  provider?: 'smm8' | 'theowlet';
   createdAt: string;
   updatedAt: string;
   rawApiResponse?: Record<string, unknown>;
@@ -55,7 +73,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   photoURL?: string;
-  isOwner: boolean; // Computed silently: email.toLowerCase() === 'preciousddkid@gmail.com'
+  isOwner: boolean; // Verified securely via backend API
   balance: number; // Regular users have numeric balance, owner has Infinity / $0 charges
   createdAt: string;
 }

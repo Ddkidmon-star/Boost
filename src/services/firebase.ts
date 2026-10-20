@@ -23,11 +23,24 @@ import {
 import firebaseConfig from '../../firebase-applet-config.json';
 import { BoostOrder, UserProfile } from '../types';
 
-export const OWNER_EMAIL = 'preciousddkid@gmail.com';
-
-export function isOwnerEmail(email?: string | null): boolean {
+// Backend-Authoritative Role Verification
+// The owner email is strictly kept and evaluated on the backend server.
+// The frontend never sees or hardcodes the owner email address.
+export async function verifyUserRoleOnBackend(email?: string | null): Promise<boolean> {
   if (!email) return false;
-  return email.trim().toLowerCase() === OWNER_EMAIL;
+  try {
+    const res = await fetch('/api/auth/verify-role', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data.isOwner);
+  } catch (e) {
+    console.warn('Backend role check error:', e);
+    return false;
+  }
 }
 
 // 1. Initialize Firebase App & Services
@@ -118,7 +131,7 @@ export async function signOut(): Promise<void> {
 // 6. Firestore User Profile Synchronization
 export async function syncUserProfile(firebaseUser: FirebaseUser): Promise<UserProfile> {
   const userRef = doc(db, 'users', firebaseUser.uid);
-  const isOwner = isOwnerEmail(firebaseUser.email);
+  const isOwner = await verifyUserRoleOnBackend(firebaseUser.email);
 
   try {
     const snap = await getDoc(userRef);
@@ -126,7 +139,7 @@ export async function syncUserProfile(firebaseUser: FirebaseUser): Promise<UserP
       const newProfile: UserProfile = {
         uid: firebaseUser.uid,
         email: firebaseUser.email || '',
-        displayName: firebaseUser.displayName || (isOwner ? 'Precious' : 'Social Creator'),
+        displayName: firebaseUser.displayName || (isOwner ? 'VIP Owner' : 'Social Creator'),
         photoURL: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
         isOwner,
         balance: isOwner ? Infinity : 20.00, // $20 welcome balance for new users
@@ -183,11 +196,10 @@ export async function updateOrderInFirestore(orderId: string, updates: Partial<B
 // 10. Subscribe to Real-time Orders for User
 export function subscribeToUserOrders(
   userId: string,
-  userEmail: string,
+  isOwner: boolean,
   onOrders: (orders: BoostOrder[]) => void
 ): Unsubscribe {
   const ordersColl = collection(db, 'orders');
-  const isOwner = isOwnerEmail(userEmail);
 
   // If owner, query all orders, otherwise query only user's orders
   const q = isOwner 
@@ -209,4 +221,27 @@ export function subscribeToUserOrders(
       handleFirestoreError(error, OperationType.LIST, 'orders');
     }
   );
+}
+
+// 11. SMM Master Configuration in Firestore (Owner Only)
+export async function saveSMMConfigToDb(config: { endpoint: string; apiKey: string }): Promise<void> {
+  const cfgRef = doc(db, 'settings', 'smm_config');
+  try {
+    await setDoc(cfgRef, { ...config, updatedAt: new Date().toISOString() });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'settings/smm_config');
+  }
+}
+
+export async function getSMMConfigFromDb(): Promise<{ endpoint: string; apiKey: string } | null> {
+  const cfgRef = doc(db, 'settings', 'smm_config');
+  try {
+    const snap = await getDoc(cfgRef);
+    if (snap.exists()) {
+      return snap.data() as { endpoint: string; apiKey: string };
+    }
+  } catch {
+    // Non-owner will get permission denied, which is expected
+  }
+  return null;
 }

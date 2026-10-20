@@ -1,5 +1,5 @@
 import React from 'react';
-import { Rocket, ListOrdered, Layers, User } from 'lucide-react';
+import { Rocket, Activity, Layers, UserCircle2 } from 'lucide-react';
 import { useSMM } from '../context/SMMContext';
 
 export const BottomNav: React.FC = () => {
@@ -17,24 +17,24 @@ export const BottomNav: React.FC = () => {
     },
     {
       id: 'orders' as const,
-      label: 'Orders',
-      icon: ListOrdered,
+      label: 'Activity',
+      icon: Activity,
       badge: activeOrdersCount > 0 ? activeOrdersCount : undefined,
     },
     {
       id: 'services' as const,
-      label: 'Services',
+      label: 'Catalog',
       icon: Layers,
     },
     {
       id: 'profile' as const,
-      label: 'Profile',
-      icon: User,
+      label: 'Account',
+      icon: UserCircle2,
     },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#0e0612]/95 backdrop-blur-xl border-t border-pink-900/30 px-2 py-1.5 pb-safe select-none">
+    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-3 py-2 pb-safe select-none shadow-lg">
       <div className="max-w-md mx-auto flex items-center justify-around">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -46,28 +46,30 @@ export const BottomNav: React.FC = () => {
               onClick={() => setActiveTab(tab.id)}
               className={`relative flex flex-col items-center justify-center py-1.5 px-4 rounded-2xl transition-all duration-200 cursor-pointer ${
                 isActive
-                  ? 'text-pink-400 scale-105'
-                  : 'text-pink-300/50 hover:text-pink-200'
+                  ? 'text-red-600 font-bold scale-105'
+                  : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              {/* Pink Active glow indicator */}
+              {/* Subtle top indicator bar */}
               {isActive && (
-                <div className="absolute -top-1.5 w-8 h-1 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 shadow-[0_0_12px_#ec4899]" />
+                <div className="absolute -top-2 w-8 h-1 rounded-full bg-red-600 shadow-xs shadow-red-500/50" />
               )}
 
               <div className="relative">
                 <Icon
                   className={`w-5 h-5 transition-transform duration-200 ${
-                    isActive ? 'stroke-[2.4] text-pink-400' : 'stroke-[1.8]'
+                    isActive ? 'stroke-[2.5] text-red-600' : 'stroke-[1.8]'
                   }`}
                 />
                 {tab.badge !== undefined && (
-                  <span className="absolute -top-1 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-pink-500 text-[10px] font-bold text-white flex items-center justify-center shadow-lg shadow-pink-500/50 animate-pulse">
+                  <span className="absolute -top-1 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-[10px] font-bold text-white flex items-center justify-center shadow-xs">
                     {tab.badge}
                   </span>
                 )}
               </div>
-              <span className={`text-[11px] mt-1 font-medium tracking-tight ${isActive ? 'font-extrabold text-white' : 'text-pink-300/50'}`}>
+              <span className={`text-[11px] mt-1 tracking-tight ${
+                isActive ? 'font-bold text-slate-900' : 'font-medium text-slate-500'
+              }`}>
                 {tab.label}
               </span>
             </button>

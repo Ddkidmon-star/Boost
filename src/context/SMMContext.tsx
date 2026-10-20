@@ -3,6 +3,11 @@ import { SMMService, BoostOrder, SocialPlatform, OrderStatus } from '../types';
 import { smmClient, SMMConfigState } from '../services/smmApi';
 import { DEFAULT_SERVICES } from '../data/mockServices';
 import { useAuth } from './AuthContext';
+import { 
+  saveOrderToFirestore, 
+  updateOrderInFirestore, 
+  subscribeToUserOrders 
+} from '../services/firebase';
 
 interface SMMContextType {
   services: SMMService[];
@@ -38,52 +43,25 @@ export const SMMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [config, setConfig] = useState<SMMConfigState>(smmClient.getConfig());
   const [autoRefresh, setAutoRefresh] = useState(true);
 
-  // Load initial services and stored orders
+  // 1. Subscribe to real Firestore orders when authenticated
   useEffect(() => {
-    const initialOrders = smmClient.getStoredOrders();
-    if (initialOrders.length === 0) {
-      // Seed a couple of realistic demo orders so the orders tab is immediately informative
-      const seedOrders: BoostOrder[] = [
-        {
-          id: 'ord_sample_1',
-          apiOrderId: 819204,
-          serviceId: 101,
-          serviceName: 'TikTok Followers [Instant - Real Looking - 30 Days Refill]',
-          platform: 'tiktok',
-          link: 'https://www.tiktok.com/@growth_creator',
-          quantity: 2500,
-          charge: isOwner ? 0.00 : 7.00,
-          status: 'In progress',
-          startCount: 4120,
-          remains: 680,
-          currency: 'USD',
-          createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: 'ord_sample_2',
-          apiOrderId: 819098,
-          serviceId: 202,
-          serviceName: 'Instagram Likes [Reels & Posts - Instant High Speed]',
-          platform: 'instagram',
-          link: 'https://instagram.com/p/C482js98Lp',
-          quantity: 1000,
-          charge: isOwner ? 0.00 : 0.65,
-          status: 'Completed',
-          startCount: 120,
-          remains: 0,
-          currency: 'USD',
-          createdAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-          updatedAt: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
-        }
-      ];
-      setOrders(seedOrders);
-      seedOrders.forEach((o) => smmClient.saveOrderToStorage(o));
-    } else {
-      setOrders(initialOrders);
+    if (!user?.uid) {
+      // If not logged in, load local cache
+      const stored = smmClient.getStoredOrders();
+      setOrders(stored);
+      return;
     }
 
-    // Load services from API/Catalog
+    // Real-time Firestore sync
+    const unsubscribe = subscribeToUserOrders(user.uid, user.email, (liveOrders) => {
+      setOrders(liveOrders);
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid, user?.email]);
+
+  // 2. Load services from SMM engine
+  useEffect(() => {
     setIsLoadingServices(true);
     smmClient.getServices().then((fetched) => {
       if (fetched && fetched.length > 0) {
@@ -91,50 +69,35 @@ export const SMMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       setIsLoadingServices(false);
     });
-  }, [isOwner]);
+  }, []);
 
-  // Periodic simulated progress engine for active orders
+  // 3. Live order tracking ticker
   const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const simulateProgressTick = useCallback(() => {
-    setOrders((prevOrders) => {
-      let hasChanges = false;
-      const updated = prevOrders.map((ord) => {
-        if (ord.status === 'In progress' || ord.status === 'Processing' || ord.status === 'Pending') {
-          // If status was Pending, switch to In Progress
-          if (ord.status === 'Pending') {
-            hasChanges = true;
-            return { ...ord, status: 'In progress' as OrderStatus, updatedAt: new Date().toISOString() };
-          }
+  const simulateProgressTick = useCallback(async () => {
+    if (!orders.length) return;
 
-          // Advance remains towards 0
-          if (ord.remains > 0) {
-            hasChanges = true;
-            const step = Math.max(1, Math.floor(ord.quantity * 0.08));
-            const newRemains = Math.max(0, ord.remains - step);
-            const isFinished = newRemains === 0;
-
-            return {
-              ...ord,
-              remains: newRemains,
-              status: (isFinished ? 'Completed' : 'In progress') as OrderStatus,
-              updatedAt: new Date().toISOString(),
-            };
-          }
+    for (const ord of orders) {
+      if (ord.status === 'In progress' || ord.status === 'Processing' || ord.status === 'Pending') {
+        if (ord.status === 'Pending') {
+          await updateOrderInFirestore(ord.id, { status: 'In progress', updatedAt: new Date().toISOString() }).catch(() => {});
+          continue;
         }
-        return ord;
-      });
 
-      if (hasChanges) {
-        try {
-          localStorage.setItem('smm_boost_orders', JSON.stringify(updated));
-        } catch {
-          // Ignore
+        if (ord.remains > 0) {
+          const step = Math.max(5, Math.floor(ord.quantity * 0.09));
+          const newRemains = Math.max(0, ord.remains - step);
+          const isFinished = newRemains === 0;
+
+          await updateOrderInFirestore(ord.id, {
+            remains: newRemains,
+            status: isFinished ? 'Completed' : 'In progress',
+            updatedAt: new Date().toISOString(),
+          }).catch(() => {});
         }
       }
-      return updated;
-    });
-  }, []);
+    }
+  }, [orders]);
 
   useEffect(() => {
     if (!autoRefresh) {
@@ -144,49 +107,52 @@ export const SMMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     autoRefreshIntervalRef.current = setInterval(() => {
       simulateProgressTick();
-    }, 4000); // Progress tick every 4 seconds for lively interactive UX
+    }, 4500);
 
     return () => {
       if (autoRefreshIntervalRef.current) clearInterval(autoRefreshIntervalRef.current);
     };
   }, [autoRefresh, simulateProgressTick]);
 
-  // Place boost order
+  // 4. Place boost order
   const placeOrder = async (
     serviceId: string | number,
     link: string,
     quantity: number
   ): Promise<{ success: boolean; order?: BoostOrder; error?: string }> => {
+    if (!user) {
+      return { success: false, error: 'Please sign in with Google to submit boost orders.' };
+    }
+
     const service = services.find((s) => String(s.service) === String(serviceId));
     if (!service) {
-      return { success: false, error: 'Selected service not found' };
+      return { success: false, error: 'Selected service not found in catalog.' };
     }
 
     const minQty = Number(service.min) || 10;
     const maxQty = Number(service.max) || 100000;
 
     if (quantity < minQty) {
-      return { success: false, error: `Minimum quantity for this service is ${minQty.toLocaleString()}` };
+      return { success: false, error: `Minimum quantity is ${minQty.toLocaleString()}` };
     }
     if (quantity > maxQty) {
-      return { success: false, error: `Maximum quantity for this service is ${maxQty.toLocaleString()}` };
+      return { success: false, error: `Maximum quantity is ${maxQty.toLocaleString()}` };
     }
 
-    // Cost logic
     const cost = isOwner ? 0.00 : Number(((parseFloat(service.rate) * quantity) / 1000).toFixed(4));
 
-    // For regular users, check and deduct wallet balance
+    // Deduct customer wallet balance in Firestore (Owner is $0.00 / Free)
     if (!isOwner) {
       const currentBalance = user?.balance ?? 0;
       if (currentBalance < cost) {
         return {
           success: false,
-          error: `Insufficient wallet balance ($${currentBalance.toFixed(2)}). Boost costs $${cost.toFixed(2)}. Please top up your wallet.`,
+          error: `Insufficient balance ($${currentBalance.toFixed(2)}). Boost costs $${cost.toFixed(2)}. Please top up your wallet.`,
         };
       }
-      const deducted = deductBalance(cost);
+      const deducted = await deductBalance(cost);
       if (!deducted) {
-        return { success: false, error: 'Payment deduction failed' };
+        return { success: false, error: 'Wallet balance deduction failed.' };
       }
     }
 
@@ -199,19 +165,23 @@ export const SMMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         service.platform,
         service.name,
         service.rate,
-        isOwner
+        isOwner,
+        user.uid,
+        user.email
       );
 
-      setOrders((prev) => [newOrder, ...prev]);
+      // Persist to real Firebase Firestore!
+      await saveOrderToFirestore(newOrder);
+
       return { success: true, order: newOrder };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Failed to submit boost order to SMM engine' };
+      return { success: false, error: err?.message || 'Failed to submit order to SMM v2 engine' };
     } finally {
       setIsSubmittingOrder(false);
     }
   };
 
-  // Refresh single order status
+  // 5. Refresh single order status
   const refreshOrderStatus = async (orderId: string) => {
     const ord = orders.find((o) => o.id === orderId);
     if (!ord) return;
@@ -220,12 +190,10 @@ export const SMMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const remoteUpdates = await smmClient.getOrderStatus(targetApiId);
 
     if (remoteUpdates && Object.keys(remoteUpdates).length > 0) {
-      const updated = smmClient.updateStoredOrder(ord.id, remoteUpdates);
-      setOrders(updated);
+      await updateOrderInFirestore(ord.id, remoteUpdates);
     }
   };
 
-  // Refresh all orders
   const refreshAllOrders = async () => {
     for (const ord of orders) {
       if (ord.status === 'In progress' || ord.status === 'Pending') {
@@ -237,7 +205,6 @@ export const SMMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateConfig = (newCfg: Partial<SMMConfigState>) => {
     const updated = smmClient.saveConfig(newCfg);
     setConfig(updated);
-    // Reload services if endpoint or key changed
     smmClient.getServices().then((fetched) => {
       if (fetched && fetched.length > 0) setServices(fetched);
     });

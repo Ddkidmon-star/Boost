@@ -21,7 +21,7 @@ const AppContent: React.FC = () => {
 
   return (
     <MobileFrameWrapper isMobileFrame={isMobileFrame}>
-      <div className="min-h-screen flex flex-col bg-[#090a0f]">
+      <div className="min-h-screen flex flex-col bg-[#09040b] text-pink-50">
         {/* Header */}
         <Header
           onOpenTopUp={() => setIsTopUpOpen(true)}

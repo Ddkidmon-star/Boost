@@ -7,11 +7,10 @@ import {
   AlertCircle, 
   Sparkles, 
   Clock, 
-  ShieldCheck, 
   Sliders, 
   ArrowRight,
   TrendingUp,
-  Zap,
+  LogIn,
   Info
 } from 'lucide-react';
 import { useSMM } from '../context/SMMContext';
@@ -35,7 +34,7 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
     preselectedServiceId,
     setPreselectedServiceId,
   } = useSMM();
-  const { user, isOwner } = useAuth();
+  const { user, isOwner, loginWithGoogle, isLoading: isAuthLoading } = useAuth();
 
   const [linkInput, setLinkInput] = useState('');
   const [detectedPlatform, setDetectedPlatform] = useState<SocialPlatform | null>(null);
@@ -51,25 +50,25 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
     return services.filter((s) => s.platform === selectedPlatform);
   }, [services, selectedPlatform]);
 
-  // Extract unique categories for selected platform
+  // Extract unique categories
   const categories = useMemo(() => {
     const set = new Set<string>();
     platformServices.forEach((s) => set.add(s.category));
     return Array.from(set);
   }, [platformServices]);
 
-  // Filtered services by category
+  // Filtered services
   const filteredServices = useMemo(() => {
     if (selectedCategory === 'all') return platformServices;
     return platformServices.filter((s) => s.category === selectedCategory);
   }, [platformServices, selectedCategory]);
 
-  // Currently selected service object
+  // Current service
   const currentService: SMMService | undefined = useMemo(() => {
     return services.find((s) => String(s.service) === String(selectedServiceId)) || filteredServices[0];
   }, [services, selectedServiceId, filteredServices]);
 
-  // Handle pre-selected service from Services tab
+  // Handle preselection
   useEffect(() => {
     if (preselectedServiceId) {
       const match = services.find((s) => String(s.service) === String(preselectedServiceId));
@@ -83,7 +82,6 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
     }
   }, [preselectedServiceId, services, setSelectedPlatform, setPreselectedServiceId]);
 
-  // Sync selectedServiceId when platform changes
   useEffect(() => {
     if (filteredServices.length > 0 && !filteredServices.some((s) => String(s.service) === String(selectedServiceId))) {
       setSelectedServiceId(filteredServices[0].service);
@@ -92,7 +90,7 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
     }
   }, [filteredServices, selectedServiceId]);
 
-  // Smart Link Detector logic
+  // Smart Link Detector
   const handleLinkChange = (value: string) => {
     setLinkInput(value);
     setErrorMessage(null);
@@ -107,7 +105,6 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
     }
   };
 
-  // Clipboard paste helper
   const handlePasteClipboard = async () => {
     try {
       const text = await navigator.clipboard.readText();
@@ -117,12 +114,10 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
         setTimeout(() => setIsCopied(false), 2000);
       }
     } catch {
-      // Browser permissions error
       setErrorMessage('Please paste the URL directly into the field.');
     }
   };
 
-  // Cost calculation
   const calculatedCost = useMemo(() => {
     if (!currentService) return 0;
     return calculateOrderCost(currentService.rate, quantity, isOwner);
@@ -131,10 +126,14 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
   const minLimit = Number(currentService?.min) || 50;
   const maxLimit = Number(currentService?.max) || 100000;
 
-  // Handle boost order submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    if (!user) {
+      setErrorMessage('Please sign in with Google to place orders.');
+      return;
+    }
 
     if (!linkInput.trim()) {
       setErrorMessage('Please enter a valid social media link or profile handle.');
@@ -166,7 +165,6 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
     }
   };
 
-  // Quick increment chips
   const handleAddQuantity = (amount: number) => {
     setQuantity((prev) => Math.min(maxLimit, Math.max(minLimit, prev + amount)));
   };
@@ -175,34 +173,73 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
 
   return (
     <div className="pb-24 pt-2 px-3 sm:px-4 max-w-xl mx-auto space-y-4">
-      {/* Top Banner / Feature Callout */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-950/60 via-slate-900 to-indigo-950/60 border border-cyan-500/20 p-4 shadow-xl">
+      {/* Pink Hero Callout Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-pink-950/70 via-[#180821] to-fuchsia-950/70 border border-pink-500/30 p-4 sm:p-5 shadow-[0_0_30px_rgba(244,63,94,0.15)]">
         <div className="relative z-10 flex items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-cyan-400 mb-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-pink-400 mb-1">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>SMM v2 Engine • Instant Delivery</span>
+              <span>SMM v2 Engine • Real High-Speed Growth</span>
             </div>
-            <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-              Boost Your Social Presence
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Instant Social Media Boost
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Paste your link, pick high retention growth, and dispatch live in seconds.
+            <p className="text-xs text-pink-200/70 mt-1">
+              Real followers, views, likes & subscribers delivered in minutes.
             </p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center shrink-0">
-            <TrendingUp className="w-5 h-5 text-cyan-400" />
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500 to-rose-500 p-[2px] shadow-lg shadow-pink-500/30 shrink-0">
+            <div className="w-full h-full bg-[#180821] rounded-[14px] flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-pink-400" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 1. Platform Selector Tabs */}
+      {/* Google Login Prompt Banner if not logged in */}
+      {!user && (
+        <div className="p-4 rounded-3xl bg-[#1b0922] border-2 border-pink-500/40 shadow-xl shadow-pink-500/20 text-center space-y-3">
+          <div>
+            <h3 className="text-sm font-bold text-white">Sign In with Google</h3>
+            <p className="text-xs text-pink-200/70 mt-0.5">
+              Connect your account to save your boosts in real Firebase database.
+            </p>
+          </div>
+          <button
+            onClick={loginWithGoogle}
+            disabled={isAuthLoading}
+            className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-extrabold text-xs shadow-lg flex items-center justify-center gap-2.5 transition cursor-pointer"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+              />
+            </svg>
+            <span>{isAuthLoading ? 'Opening Google Sign-In...' : 'Sign in with Google Account'}</span>
+          </button>
+        </div>
+      )}
+
+      {/* 1. Platform Selector Tabs in Pink */}
       <div className="space-y-1.5">
-        <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+        <label className="text-[11px] font-bold uppercase tracking-wider text-pink-300/80 flex items-center justify-between">
           <span>Select Platform</span>
           {detectedPlatform && (
-            <span className="text-cyan-400 font-mono text-[10px] lowercase flex items-center gap-1">
-              <Check className="w-3 h-3" /> Auto-detected
+            <span className="text-pink-400 font-mono text-[10px] lowercase flex items-center gap-1 font-bold">
+              <Check className="w-3 h-3 text-pink-400" /> Auto-detected
             </span>
           )}
         </label>
@@ -216,10 +253,10 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
                   setSelectedPlatform(platform.id);
                   setSelectedCategory('all');
                 }}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all duration-200 cursor-pointer ${
                   isSelected
-                    ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-white shadow-lg shadow-cyan-500/20 scale-[1.02]'
-                    : 'bg-slate-900/90 text-slate-400 hover:text-slate-200 border border-slate-800 hover:border-slate-700'
+                    ? 'bg-gradient-to-r from-pink-500 via-rose-500 to-fuchsia-600 text-white shadow-lg shadow-pink-500/30 scale-[1.02]'
+                    : 'bg-[#150a1c] text-pink-200/60 hover:text-white border border-pink-900/30 hover:border-pink-500/40'
                 }`}
               >
                 <span>{platform.name}</span>
@@ -233,14 +270,14 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
         {/* 2. SMART LINK DETECTOR INPUT */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <LinkIcon className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Social Media Link or Username</span>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-pink-300/80 flex items-center gap-1.5">
+              <LinkIcon className="w-3.5 h-3.5 text-pink-400" />
+              <span>Target Link or Handle</span>
             </label>
             <button
               type="button"
               onClick={handlePasteClipboard}
-              className="text-[11px] font-medium text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition cursor-pointer"
+              className="text-[11px] font-bold text-pink-400 hover:text-pink-300 flex items-center gap-1 transition cursor-pointer"
             >
               {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Clipboard className="w-3 h-3" />}
               <span>{isCopied ? 'Pasted!' : 'Paste Link'}</span>
@@ -253,34 +290,34 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
               value={linkInput}
               onChange={(e) => handleLinkChange(e.target.value)}
               placeholder={activePlatformConfig.placeholder}
-              className="w-full bg-[#0d101a] border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-3 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 transition font-mono pr-20"
+              className="w-full bg-[#120718] border border-pink-900/40 focus:border-pink-500 rounded-2xl px-4 py-3 text-sm text-white placeholder-pink-300/30 focus:outline-none focus:ring-2 focus:ring-pink-500/30 transition font-mono pr-24 shadow-inner"
             />
             {detectedPlatform && (
-              <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/30 capitalize flex items-center gap-1">
-                  <Check className="w-2.5 h-2.5 text-cyan-400" />
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                <span className="px-2.5 py-1 rounded-xl bg-pink-500/20 text-pink-300 text-[10px] font-bold border border-pink-500/40 capitalize flex items-center gap-1 shadow-sm">
+                  <Check className="w-2.5 h-2.5 text-pink-400" />
                   {detectedPlatform}
                 </span>
               </div>
             )}
           </div>
-          <p className="text-[11px] text-slate-400 flex items-center gap-1">
-            <Info className="w-3 h-3 text-slate-400 shrink-0" />
-            <span>Smart detector auto-identifies TikTok, Instagram, YouTube, X, and switches platform.</span>
+          <p className="text-[11px] text-pink-300/60 flex items-center gap-1">
+            <Info className="w-3 h-3 text-pink-400 shrink-0" />
+            <span>Smart link detector auto-identifies platform and configures services.</span>
           </p>
         </div>
 
-        {/* 3. Category Filter & Service Selection */}
+        {/* 3. Category & Service Selection */}
         <div className="space-y-2">
           {categories.length > 1 && (
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
               <button
                 type="button"
                 onClick={() => setSelectedCategory('all')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
+                className={`px-3 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer ${
                   selectedCategory === 'all'
-                    ? 'bg-slate-700 text-white font-semibold'
-                    : 'bg-slate-900/60 text-slate-400 hover:text-slate-300'
+                    ? 'bg-pink-500 text-white font-extrabold shadow-md shadow-pink-500/30'
+                    : 'bg-[#150a1c] text-pink-200/60 hover:text-white border border-pink-900/30'
                 }`}
               >
                 All Services
@@ -290,10 +327,10 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
                   key={cat}
                   type="button"
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition cursor-pointer ${
+                  className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
                     selectedCategory === cat
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-semibold'
-                      : 'bg-slate-900/60 text-slate-400 hover:text-slate-300'
+                      ? 'bg-pink-500 text-white font-extrabold shadow-md shadow-pink-500/30'
+                      : 'bg-[#150a1c] text-pink-200/60 hover:text-white border border-pink-900/30'
                   }`}
                 >
                   {cat.replace(`${activePlatformConfig.name} - `, '')}
@@ -303,9 +340,9 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-pink-300/80 flex items-center justify-between">
               <span>Select Service</span>
-              <span className="text-[10px] text-slate-400">ID #{currentService?.service}</span>
+              <span className="text-[10px] text-pink-400 font-mono">ID #{currentService?.service}</span>
             </label>
             <div className="relative">
               <select
@@ -317,48 +354,48 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
                     setQuantity((prev) => Math.max(Number(s.min) || 100, prev));
                   }
                 }}
-                className="w-full bg-[#0d101a] border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-3 text-xs sm:text-sm text-white focus:outline-none focus:ring-1 focus:ring-cyan-500/50 appearance-none transition cursor-pointer pr-8"
+                className="w-full bg-[#120718] border border-pink-900/40 focus:border-pink-500 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-pink-500/30 appearance-none transition cursor-pointer pr-10 shadow-inner"
               >
                 {filteredServices.map((srv) => (
-                  <option key={srv.service} value={srv.service} className="bg-slate-900 text-white py-1">
+                  <option key={srv.service} value={srv.service} className="bg-[#17091f] text-white py-1">
                     #{srv.service} - {srv.name} ({isOwner ? 'FREE' : `$${srv.rate}/1k`})
                   </option>
                 ))}
               </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+              <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-pink-400">
                 <Sliders className="w-4 h-4" />
               </div>
             </div>
           </div>
 
-          {/* Service Details Card */}
+          {/* Service Specs Card */}
           {currentService && (
-            <div className="bg-slate-900/70 border border-slate-800/80 rounded-xl p-3 text-xs space-y-2">
-              <div className="flex items-center justify-between text-slate-300">
-                <span className="font-medium text-white">{currentService.name}</span>
-                <span className="font-mono font-bold text-cyan-400 shrink-0 ml-2">
-                  {isOwner ? 'FREE' : `$${currentService.rate} / 1,000`}
+            <div className="bg-[#15091c] border border-pink-500/20 rounded-2xl p-3.5 text-xs space-y-2 shadow-lg">
+              <div className="flex items-center justify-between text-pink-100">
+                <span className="font-bold text-white">{currentService.name}</span>
+                <span className="font-mono font-extrabold text-pink-400 shrink-0 ml-2">
+                  {isOwner ? 'FREE' : `$${currentService.rate} / 1k`}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800 text-[11px] text-slate-400">
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-pink-900/30 text-[11px] text-pink-200/70">
                 <div>
-                  <span className="text-slate-400 block text-[9px] uppercase">Min</span>
-                  <span className="font-mono text-slate-200">{Number(currentService.min).toLocaleString()}</span>
+                  <span className="text-pink-400/80 block text-[9px] uppercase font-bold">Min</span>
+                  <span className="font-mono text-white font-bold">{Number(currentService.min).toLocaleString()}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[9px] uppercase">Max</span>
-                  <span className="font-mono text-slate-200">{Number(currentService.max).toLocaleString()}</span>
+                  <span className="text-pink-400/80 block text-[9px] uppercase font-bold">Max</span>
+                  <span className="font-mono text-white font-bold">{Number(currentService.max).toLocaleString()}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[9px] uppercase">Avg Speed</span>
-                  <span className="text-cyan-300 flex items-center gap-1 font-mono">
-                    <Clock className="w-2.5 h-2.5" />
+                  <span className="text-pink-400/80 block text-[9px] uppercase font-bold">Delivery Speed</span>
+                  <span className="text-pink-300 flex items-center gap-1 font-mono font-bold">
+                    <Clock className="w-2.5 h-2.5 text-pink-400" />
                     {currentService.averageTime || 'Instant'}
                   </span>
                 </div>
               </div>
               {currentService.description && (
-                <p className="text-[11px] text-slate-400 leading-relaxed border-t border-slate-800/60 pt-1.5">
+                <p className="text-[11px] text-pink-200/70 leading-relaxed border-t border-pink-900/30 pt-1.5">
                   {currentService.description}
                 </p>
               )}
@@ -369,10 +406,10 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
         {/* 4. Quantity Selector */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-pink-300/80">
               Quantity
             </label>
-            <span className="text-xs font-mono font-bold text-white bg-slate-800 px-2.5 py-0.5 rounded-lg border border-slate-700">
+            <span className="text-xs font-mono font-bold text-white bg-pink-500/20 px-3 py-1 rounded-xl border border-pink-500/40 shadow-sm">
               {quantity.toLocaleString()} units
             </span>
           </div>
@@ -387,11 +424,11 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
                 const val = parseInt(e.target.value) || 0;
                 setQuantity(val);
               }}
-              className="w-full bg-[#0d101a] border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+              className="w-full bg-[#120718] border border-pink-900/40 focus:border-pink-500 rounded-2xl px-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-pink-500/30 shadow-inner"
             />
           </div>
 
-          {/* Slider */}
+          {/* Pink Slider */}
           <input
             type="range"
             min={minLimit}
@@ -399,17 +436,17 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
             step={50}
             value={Math.min(quantity, 50000)}
             onChange={(e) => setQuantity(Number(e.target.value))}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+            className="w-full h-2 bg-pink-950/60 rounded-lg appearance-none cursor-pointer accent-pink-500"
           />
 
-          {/* Quick Increment Buttons */}
+          {/* Quick Increment Chips in Pink */}
           <div className="flex items-center gap-1.5 flex-wrap">
             {[100, 500, 1000, 2500, 5000, 10000].map((amt) => (
               <button
                 key={amt}
                 type="button"
                 onClick={() => handleAddQuantity(amt)}
-                className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-slate-300 hover:text-white transition cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-[#17091f] hover:bg-pink-900/40 border border-pink-900/30 text-[11px] font-mono text-pink-200 hover:text-white transition cursor-pointer"
               >
                 +{amt >= 1000 ? `${amt / 1000}k` : amt}
               </button>
@@ -417,7 +454,7 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
             <button
               type="button"
               onClick={() => setQuantity(minLimit)}
-              className="px-2 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono text-slate-400 hover:text-slate-200 transition cursor-pointer"
+              className="px-2.5 py-1.5 rounded-xl bg-[#17091f] hover:bg-pink-900/40 border border-pink-900/30 text-[10px] font-mono text-pink-400 hover:text-pink-300 transition cursor-pointer font-bold"
             >
               Min
             </button>
@@ -425,46 +462,46 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
         </div>
 
         {/* 5. Cost Summary & Calculation */}
-        <div className="rounded-2xl bg-gradient-to-b from-slate-900/90 to-slate-950/90 border border-slate-800 p-4 space-y-3">
-          <div className="flex items-center justify-between text-xs text-slate-400">
+        <div className="rounded-3xl bg-gradient-to-b from-[#180821] to-[#120619] border border-pink-500/30 p-4 sm:p-5 space-y-3 shadow-xl">
+          <div className="flex items-center justify-between text-xs text-pink-300/70">
             <span>Rate per 1,000 units</span>
-            <span className="font-mono text-slate-300">{isOwner ? '$0.00 (Free)' : `$${currentService?.rate || '1.00'}`}</span>
+            <span className="font-mono text-white">{isOwner ? '$0.00 (Free)' : `$${currentService?.rate || '1.00'}`}</span>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-slate-400">
+          <div className="flex items-center justify-between text-xs text-pink-300/70">
             <span>Target Quantity</span>
-            <span className="font-mono text-slate-300">{quantity.toLocaleString()}</span>
+            <span className="font-mono text-white">{quantity.toLocaleString()}</span>
           </div>
 
-          <div className="border-t border-slate-800/80 pt-2 flex items-center justify-between">
+          <div className="border-t border-pink-900/40 pt-2.5 flex items-center justify-between">
             <div>
-              <span className="text-xs uppercase font-semibold text-slate-400 block">Total Price</span>
+              <span className="text-xs uppercase font-extrabold text-pink-300/80 block">Total Price</span>
               {isOwner ? (
-                <span className="text-[10px] text-cyan-400 font-mono">Owner Privilege: Free Boost</span>
+                <span className="text-[10px] text-pink-400 font-mono font-bold">Owner Privilege: Free Boost</span>
               ) : (
-                <span className="text-[10px] text-slate-400 font-mono">
+                <span className="text-[10px] text-pink-300/60 font-mono">
                   Wallet: {formatCurrency(user?.balance || 0, false)}
                 </span>
               )}
             </div>
             <div className="text-right">
-              <span className={`text-xl font-extrabold font-mono ${isOwner ? 'text-cyan-400' : 'text-emerald-400'}`}>
+              <span className="text-2xl font-black font-mono text-pink-400 drop-shadow-[0_0_12px_rgba(244,63,94,0.6)]">
                 {isOwner ? '$0.00 / Free' : `$${calculatedCost.toFixed(2)}`}
               </span>
             </div>
           </div>
 
-          {/* Insufficient funds prompt for non-owners */}
-          {!isOwner && (user?.balance || 0) < calculatedCost && (
-            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 text-xs text-amber-300">
+          {/* Insufficient funds warning for non-owners */}
+          {user && !isOwner && (user?.balance || 0) < calculatedCost && (
+            <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-xs text-rose-300 font-medium">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>Insufficient balance for this boost</span>
               </div>
               <button
                 type="button"
                 onClick={onOpenTopUp}
-                className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition cursor-pointer"
+                className="px-3 py-1 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold transition cursor-pointer shadow-md shadow-pink-500/30"
               >
                 Top Up
               </button>
@@ -474,7 +511,7 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
 
         {/* Error notice */}
         {errorMessage && (
-          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+          <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
@@ -484,69 +521,71 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
         <button
           type="submit"
           disabled={isSubmittingOrder}
-          className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-pink-500 hover:from-cyan-400 hover:via-indigo-500 hover:to-pink-400 text-white font-bold text-sm shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-2 transition duration-200 disabled:opacity-50 cursor-pointer active:scale-[0.98]"
+          className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-fuchsia-600 hover:from-pink-400 hover:to-fuchsia-500 text-white font-black text-sm shadow-[0_0_30px_rgba(236,72,153,0.35)] flex items-center justify-center gap-2 transition duration-200 disabled:opacity-50 cursor-pointer active:scale-[0.98]"
         >
           {isSubmittingOrder ? (
             <>
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              <span>Connecting to SMM Engine...</span>
+              <span>Dispatching to SMM Engine...</span>
             </>
           ) : (
             <>
               <Rocket className="w-4 h-4 fill-white/20" />
-              <span>Submit Boost Order</span>
+              <span>SUBMIT BOOST ORDER</span>
               <ArrowRight className="w-4 h-4" />
             </>
           )}
         </button>
       </form>
 
-      {/* Success Modal / Confirmation Dialog */}
+      {/* Success Modal in Hot Pink */}
       {successOrder && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#111422] border border-cyan-500/30 rounded-2xl p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
-            <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center mx-auto">
-              <Zap className="w-6 h-6 text-cyan-400" />
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#16081e] border-2 border-pink-500/40 rounded-3xl p-6 shadow-2xl shadow-pink-500/30 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-pink-500 to-rose-500 p-[2px] mx-auto shadow-lg shadow-pink-500/40">
+              <div className="w-full h-full bg-[#16081e] rounded-[14px] flex items-center justify-center">
+                <Sparkles className="w-7 h-7 text-pink-400" />
+              </div>
             </div>
 
             <div className="text-center space-y-1">
-              <h3 className="text-base font-bold text-white">Boost Order Dispatched!</h3>
-              <p className="text-xs text-slate-400">
-                Order sent to SMM v2 engine. Delivery starting shortly.
+              <h3 className="text-lg font-black text-white">Boost Order Dispatched!</h3>
+              <p className="text-xs text-pink-200/70">
+                Order sent to SMM engine and saved in real Firestore database.
               </p>
             </div>
 
-            <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-800 text-xs space-y-2">
+            <div className="bg-[#1d0a27] rounded-2xl p-4 border border-pink-500/20 text-xs space-y-2.5">
               <div className="flex justify-between">
-                <span className="text-slate-400">Order ID:</span>
-                <span className="font-mono text-cyan-300 font-bold">#{successOrder.apiOrderId}</span>
+                <span className="text-pink-300/70">Order ID:</span>
+                <span className="font-mono text-pink-400 font-bold">#{successOrder.apiOrderId}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Service:</span>
-                <span className="text-slate-200 font-medium truncate max-w-[180px]">{successOrder.serviceName}</span>
+                <span className="text-pink-300/70">Service:</span>
+                <span className="text-white font-bold truncate max-w-[180px]">{successOrder.serviceName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Quantity:</span>
-                <span className="font-mono text-white font-bold">{successOrder.quantity.toLocaleString()}</span>
+                <span className="text-pink-300/70">Quantity:</span>
+                <span className="font-mono text-white font-extrabold">{successOrder.quantity.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Charged:</span>
-                <span className="font-mono text-emerald-400 font-bold">
+                <span className="text-pink-300/70">Charged:</span>
+                <span className="font-mono text-pink-400 font-extrabold">
                   {isOwner ? '$0.00 / Free' : `$${successOrder.charge.toFixed(2)}`}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Status:</span>
-                <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-semibold text-[10px]">
+                <span className="text-pink-300/70">Status:</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-bold text-[10px] border border-pink-500/40">
                   {successOrder.status}
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pt-1">
               <button
                 onClick={() => setSuccessOrder(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                className="flex-1 py-3 rounded-2xl bg-pink-950/40 hover:bg-pink-900/40 border border-pink-800/40 text-pink-200 text-xs font-bold transition cursor-pointer"
               >
                 Boost Another
               </button>
@@ -555,7 +594,7 @@ export const OrderScreen: React.FC<OrderScreenProps> = ({ onOpenTopUp }) => {
                   setSuccessOrder(null);
                   setActiveTab('orders');
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold transition flex items-center justify-center gap-1.5"
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-extrabold transition flex items-center justify-center gap-1.5 shadow-lg shadow-pink-500/30 cursor-pointer"
               >
                 <span>Track Live</span>
                 <ArrowRight className="w-3.5 h-3.5" />

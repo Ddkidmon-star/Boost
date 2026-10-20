@@ -3,17 +3,12 @@ import {
   User, 
   Wallet, 
   Key, 
-  Settings, 
   LogOut, 
   Check, 
-  ExternalLink, 
   Smartphone, 
   Terminal, 
   Copy, 
-  ShieldCheck, 
-  AlertCircle,
-  HelpCircle,
-  Cpu
+  LogIn
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSMM } from '../context/SMMContext';
@@ -30,24 +25,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onOpenApiSettings,
   onOpenAuth 
 }) => {
-  const { user, isOwner, logout, loginAsOwnerDemo, loginAsCustomerDemo } = useAuth();
+  const { user, isOwner, logout, loginWithGoogle } = useAuth();
   const { orders, config } = useSMM();
 
   const [copiedCode, setCopiedCode] = useState(false);
   const [showDeveloperDocs, setShowDeveloperDocs] = useState(false);
 
-  // Calculate order stats
   const totalOrders = orders.length;
   const completedOrders = orders.filter((o) => o.status === 'Completed').length;
   const totalUnits = orders.reduce((acc, o) => acc + o.quantity, 0);
 
   const reactNativeSnippet = `// React Native / Expo SMM v2 Engine Implementation
-// Compatible with Expo SDK 52+ & React Native 0.76+
-import { useState } from 'react';
 import { auth } from './firebaseConfig';
 
 const SMM_ENDPOINT = "${config.endpoint || 'https://smm8.com/api/v2'}";
-const MASTER_KEY = "YOUR_SMM_API_KEY";
+const MASTER_KEY = "YOUR_MASTER_API_KEY";
 
 export async function placeBoostOrder(serviceId, link, quantity, userEmail) {
   // Silent Owner check: Preciousddkid@gmail.com enjoys $0.00 free rate
@@ -77,72 +69,92 @@ export async function placeBoostOrder(serviceId, link, quantity, userEmail) {
 
   return (
     <div className="pb-24 pt-2 px-3 sm:px-4 max-w-xl mx-auto space-y-4">
-      {/* Profile Card */}
-      <div className="bg-[#0e111c] border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden">
-        <div className="flex items-center gap-3.5">
-          <img
-            src={user?.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-            alt=""
-            className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-700 shadow-lg"
-          />
-          <div className="overflow-hidden flex-1">
-            <h2 className="text-base font-bold text-white truncate">
-              {user?.displayName || 'User'}
-            </h2>
-            <p className="text-xs text-slate-400 font-mono truncate">{user?.email}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                SMM v2 Active
-              </span>
+      {/* Profile Card in Pink */}
+      <div className="bg-[#15091c] border border-pink-500/20 rounded-3xl p-5 shadow-xl shadow-pink-950/20 relative overflow-hidden">
+        {user ? (
+          <div className="flex items-center gap-3.5">
+            <img
+              src={user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+              alt=""
+              className="w-14 h-14 rounded-2xl object-cover border-2 border-pink-500/40 shadow-lg shadow-pink-500/20"
+            />
+            <div className="overflow-hidden flex-1">
+              <h2 className="text-base font-bold text-white truncate">
+                {user.displayName || 'Social Creator'}
+              </h2>
+              <p className="text-xs text-pink-300/70 font-mono truncate">{user.email}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] font-mono text-pink-300 bg-pink-500/10 px-2 py-0.5 rounded-full border border-pink-500/20">
+                  Firebase Connected
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="text-center py-2 space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-pink-500/10 border border-pink-500/30 flex items-center justify-center mx-auto text-pink-400">
+              <User className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">Not Signed In</h3>
+              <p className="text-xs text-pink-300/60">Sign in with your Google account to access your wallet</p>
+            </div>
+            <button
+              onClick={loginWithGoogle}
+              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold text-xs shadow-lg shadow-pink-500/30 inline-flex items-center gap-2 cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign in with Google</span>
+            </button>
+          </div>
+        )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-800 text-center">
-          <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
-            <span className="text-[10px] text-slate-400 uppercase font-mono block">Boosts</span>
-            <span className="text-sm font-bold font-mono text-white">{totalOrders}</span>
+        <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-pink-900/30 text-center">
+          <div className="bg-[#1b0a24] p-2.5 rounded-2xl border border-pink-900/40">
+            <span className="text-[10px] text-pink-300/70 uppercase font-mono block">Boosts</span>
+            <span className="text-sm font-extrabold font-mono text-white">{totalOrders}</span>
           </div>
-          <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
-            <span className="text-[10px] text-slate-400 uppercase font-mono block">Completed</span>
-            <span className="text-sm font-bold font-mono text-emerald-400">{completedOrders}</span>
+          <div className="bg-[#1b0a24] p-2.5 rounded-2xl border border-pink-900/40">
+            <span className="text-[10px] text-pink-300/70 uppercase font-mono block">Done</span>
+            <span className="text-sm font-extrabold font-mono text-emerald-400">{completedOrders}</span>
           </div>
-          <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
-            <span className="text-[10px] text-slate-400 uppercase font-mono block">Units</span>
-            <span className="text-sm font-bold font-mono text-cyan-400">{totalUnits.toLocaleString()}</span>
+          <div className="bg-[#1b0a24] p-2.5 rounded-2xl border border-pink-900/40">
+            <span className="text-[10px] text-pink-300/70 uppercase font-mono block">Units</span>
+            <span className="text-sm font-extrabold font-mono text-pink-400">{totalUnits.toLocaleString()}</span>
           </div>
         </div>
       </div>
 
       {/* Wallet Balance Card */}
-      <div className="bg-[#0e111c] border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+      <div className="bg-[#15091c] border border-pink-500/20 rounded-3xl p-5 space-y-3 shadow-lg">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <Wallet className="w-4 h-4 text-emerald-400" />
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-pink-500/10 border border-pink-500/30 flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-pink-400" />
             </div>
             <div>
-              <span className="text-xs uppercase font-semibold text-slate-400 block">Available Balance</span>
-              <span className={`text-xl font-extrabold font-mono ${isOwner ? 'text-cyan-400' : 'text-emerald-400'}`}>
+              <span className="text-xs uppercase font-extrabold text-pink-300/70 block">Wallet Balance</span>
+              <span className={`text-xl font-black font-mono ${isOwner ? 'text-pink-400 drop-shadow-[0_0_10px_rgba(244,63,94,0.5)]' : 'text-white'}`}>
                 {formatCurrency(user?.balance || 0, isOwner)}
               </span>
             </div>
           </div>
 
-          {/* Top-up button: Hidden/disabled for owner as requested in specs */}
+          {/* Top-up button: Hidden/disabled for owner as required by prompt specs */}
           {!isOwner ? (
             <button
               onClick={onOpenTopUp}
-              className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
+              disabled={!user}
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-pink-500/30 disabled:opacity-50"
             >
               <Wallet className="w-3.5 h-3.5" />
               <span>Add Funds</span>
             </button>
           ) : (
             <div className="text-right">
-              <span className="text-[10px] text-cyan-400/90 font-mono bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/20">
-                Unlimited Boost Access
+              <span className="text-[10px] text-pink-300 font-mono bg-pink-500/15 px-3 py-1.5 rounded-xl border border-pink-500/30 font-bold">
+                Unlimited Free Boosts
               </span>
             </div>
           )}
@@ -150,95 +162,77 @@ export async function placeBoostOrder(serviceId, link, quantity, userEmail) {
       </div>
 
       {/* Settings & Configuration Section */}
-      <div className="bg-[#0e111c] border border-slate-800 rounded-2xl p-2 space-y-1 shadow-lg text-xs">
+      <div className="bg-[#15091c] border border-pink-500/20 rounded-3xl p-2 space-y-1 shadow-lg text-xs">
         <button
           onClick={onOpenApiSettings}
-          className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-800/60 transition text-left cursor-pointer"
+          className="w-full flex items-center justify-between p-3.5 rounded-2xl hover:bg-pink-900/30 transition text-left cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center">
               <Key className="w-4 h-4" />
             </div>
             <div>
-              <p className="font-semibold text-white">SMM v2 Engine Settings</p>
-              <p className="text-[11px] text-slate-400 font-mono truncate max-w-[220px]">
+              <p className="font-bold text-white">SMM v2 Engine Settings</p>
+              <p className="text-[11px] text-pink-300/60 font-mono truncate max-w-[220px]">
                 {config.endpoint}
               </p>
             </div>
           </div>
-          <span className="text-cyan-400 font-medium">Configure</span>
+          <span className="text-pink-400 font-bold">Configure</span>
         </button>
 
         <button
           onClick={() => setShowDeveloperDocs(!showDeveloperDocs)}
-          className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-800/60 transition text-left cursor-pointer"
+          className="w-full flex items-center justify-between p-3.5 rounded-2xl hover:bg-pink-900/30 transition text-left cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-fuchsia-500/10 text-fuchsia-400 flex items-center justify-center">
               <Terminal className="w-4 h-4" />
             </div>
             <div>
-              <p className="font-semibold text-white">React Native / Expo Architecture</p>
-              <p className="text-[11px] text-slate-400">Export code snippets & API v2 spec</p>
+              <p className="font-bold text-white">React Native / Expo Engine Code</p>
+              <p className="text-[11px] text-pink-300/60">Export native code snippets</p>
             </div>
           </div>
-          <span className="text-indigo-400 font-medium">{showDeveloperDocs ? 'Hide' : 'View'}</span>
-        </button>
-
-        <button
-          onClick={onOpenAuth}
-          className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-800/60 transition text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-pink-500/10 text-pink-400 flex items-center justify-center">
-              <User className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="font-semibold text-white">Firebase Google Sign-In Setup</p>
-              <p className="text-[11px] text-slate-400">Redirect auth & account switching</p>
-            </div>
-          </div>
-          <span className="text-pink-400 font-medium">Manage</span>
+          <span className="text-fuchsia-400 font-bold">{showDeveloperDocs ? 'Hide' : 'View'}</span>
         </button>
       </div>
 
-      {/* Developer Docs / Expo React Native Component Breakdown */}
+      {/* Developer Expo Code */}
       {showDeveloperDocs && (
-        <div className="bg-[#0b0d17] border border-indigo-500/30 rounded-2xl p-4 space-y-3 animate-in fade-in">
+        <div className="bg-[#110517] border border-pink-500/30 rounded-3xl p-4 space-y-3 animate-in fade-in">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Smartphone className="w-4 h-4 text-indigo-400" />
+              <Smartphone className="w-4 h-4 text-pink-400" />
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                 React Native / Expo v2 Handler
               </h3>
             </div>
             <button
               onClick={handleCopyCode}
-              className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-mono cursor-pointer"
+              className="text-xs text-pink-400 hover:text-pink-300 flex items-center gap-1 font-mono cursor-pointer font-bold"
             >
               {copiedCode ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
               <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
             </button>
           </div>
 
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            Directly copyable for your Expo mobile app with silent owner recognition:
-          </p>
-
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] font-mono text-cyan-300 overflow-x-auto max-h-56">
+          <div className="bg-[#0c0310] p-3 rounded-2xl border border-pink-900/40 text-[11px] font-mono text-pink-300 overflow-x-auto max-h-56">
             <pre>{reactNativeSnippet}</pre>
           </div>
         </div>
       )}
 
-      {/* Logout button */}
-      <button
-        onClick={logout}
-        className="w-full py-3 rounded-xl bg-slate-900 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
-      >
-        <LogOut className="w-4 h-4" />
-        <span>Sign Out of Account</span>
-      </button>
+      {/* Logout button if logged in */}
+      {user && (
+        <button
+          onClick={logout}
+          className="w-full py-3.5 rounded-2xl bg-[#17091f] hover:bg-rose-500/20 border border-pink-900/40 hover:border-rose-500/40 text-pink-300/80 hover:text-rose-300 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Sign Out of Google Account</span>
+        </button>
+      )}
     </div>
   );
 };

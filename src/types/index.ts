@@ -33,6 +33,8 @@ export type OrderStatus =
 export interface BoostOrder {
   id: string; // Internal order id
   apiOrderId?: string | number; // Remote SMM provider order id
+  userId?: string;
+  userEmail?: string;
   serviceId: string | number;
   serviceName: string;
   platform: SocialPlatform;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, CreditCard, DollarSign, CheckCircle2, ShieldCheck, ArrowRight, Wallet } from 'lucide-react';
+import { X, CreditCard, DollarSign, CheckCircle2, ArrowRight, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface TopUpModalProps {
@@ -19,38 +19,40 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({ isOpen, onClose }) => {
 
   const finalAmount = customAmount ? parseFloat(customAmount) || 0 : selectedAmount;
 
-  const handleDeposit = () => {
+  const handleDeposit = async () => {
     if (finalAmount <= 0) return;
     setIsProcessing(true);
 
-    setTimeout(() => {
-      topUpWallet(finalAmount);
+    try {
+      await topUpWallet(finalAmount);
       setIsProcessing(false);
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
         onClose();
       }, 1500);
-    }, 1000);
+    } catch {
+      setIsProcessing(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-[#101322] border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-[#16081e] border-2 border-pink-500/40 rounded-3xl p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <Wallet className="w-4 h-4 text-emerald-400" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-pink-500/10 border border-pink-500/30 flex items-center justify-center">
+              <Wallet className="w-4 h-4 text-pink-400" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white">Top Up Wallet</h3>
-              <p className="text-[10px] text-slate-400">Current balance: ${(user?.balance || 0).toFixed(2)}</p>
+              <h3 className="text-sm font-black text-white">Top Up Wallet</h3>
+              <p className="text-[10px] text-pink-300/70">Current balance: ${(user?.balance || 0).toFixed(2)}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1 rounded-xl text-pink-400 hover:text-white hover:bg-pink-900/30 transition"
           >
             <X className="w-4 h-4" />
           </button>
@@ -62,13 +64,13 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({ isOpen, onClose }) => {
               <CheckCircle2 className="w-7 h-7" />
             </div>
             <h4 className="text-sm font-bold text-white">Deposit Successful!</h4>
-            <p className="text-xs text-slate-400 font-mono">+${finalAmount.toFixed(2)} added to your wallet</p>
+            <p className="text-xs text-pink-300/70 font-mono">+${finalAmount.toFixed(2)} added to Firestore wallet</p>
           </div>
         ) : (
           <>
-            {/* Quick Amount Chips */}
+            {/* Quick Amount Chips in Pink */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-pink-300/80">
                 Select Amount
               </label>
               <div className="grid grid-cols-4 gap-2">
@@ -80,10 +82,10 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({ isOpen, onClose }) => {
                       setSelectedAmount(amt);
                       setCustomAmount('');
                     }}
-                    className={`py-2 rounded-xl text-xs font-mono font-bold transition cursor-pointer ${
+                    className={`py-2.5 rounded-2xl text-xs font-mono font-black transition cursor-pointer ${
                       selectedAmount === amt && !customAmount
-                        ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
-                        : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-500/30'
+                        : 'bg-[#1c0a24] text-pink-200/70 hover:bg-pink-900/30 border border-pink-900/40'
                     }`}
                   >
                     ${amt}
@@ -93,7 +95,7 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({ isOpen, onClose }) => {
 
               {/* Custom amount */}
               <div className="relative mt-2">
-                <DollarSign className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <DollarSign className="w-4 h-4 text-pink-400/60 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="number"
                   placeholder="Custom amount (USD)"
@@ -101,49 +103,49 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({ isOpen, onClose }) => {
                   onChange={(e) => {
                     setCustomAmount(e.target.value);
                   }}
-                  className="w-full bg-[#0d101a] border border-slate-800 focus:border-emerald-500 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder-slate-500 font-mono focus:outline-none"
+                  className="w-full bg-[#120718] border border-pink-900/40 focus:border-pink-500 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-pink-300/30 font-mono focus:outline-none shadow-inner"
                 />
               </div>
             </div>
 
             {/* Payment Method Selector */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-pink-300/80">
                 Payment Method
               </label>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('card')}
-                  className={`p-2.5 rounded-xl border flex items-center gap-2 transition cursor-pointer ${
+                  className={`p-3 rounded-2xl border flex items-center gap-2 transition cursor-pointer ${
                     paymentMethod === 'card'
-                      ? 'bg-emerald-500/15 border-emerald-500 text-white font-medium'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      ? 'bg-pink-500/20 border-pink-500 text-white font-bold'
+                      : 'bg-[#1c0a24] border-pink-900/40 text-pink-300/60 hover:text-white'
                   }`}
                 >
-                  <CreditCard className="w-4 h-4 text-emerald-400" />
-                  <span>Card / Visa</span>
+                  <CreditCard className="w-4 h-4 text-pink-400" />
+                  <span>Debit / Card</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('crypto')}
-                  className={`p-2.5 rounded-xl border flex items-center gap-2 transition cursor-pointer ${
+                  className={`p-3 rounded-2xl border flex items-center gap-2 transition cursor-pointer ${
                     paymentMethod === 'crypto'
-                      ? 'bg-emerald-500/15 border-emerald-500 text-white font-medium'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      ? 'bg-pink-500/20 border-pink-500 text-white font-bold'
+                      : 'bg-[#1c0a24] border-pink-900/40 text-pink-300/60 hover:text-white'
                   }`}
                 >
-                  <span className="font-bold text-xs text-emerald-400">₮</span>
+                  <span className="font-bold text-xs text-pink-400">₮</span>
                   <span>USDT / Crypto</span>
                 </button>
               </div>
             </div>
 
             {/* Total checkout info */}
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs">
-              <span className="text-slate-400">Total Deposit</span>
-              <span className="font-mono text-base font-bold text-emerald-400">
+            <div className="bg-[#120718] p-3.5 rounded-2xl border border-pink-900/40 flex items-center justify-between text-xs">
+              <span className="text-pink-300/70">Total Deposit</span>
+              <span className="font-mono text-base font-black text-pink-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]">
                 ${finalAmount.toFixed(2)}
               </span>
             </div>
@@ -152,16 +154,16 @@ export const TopUpModal: React.FC<TopUpModalProps> = ({ isOpen, onClose }) => {
             <button
               onClick={handleDeposit}
               disabled={isProcessing || finalAmount <= 0}
-              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-fuchsia-600 hover:from-pink-400 hover:to-fuchsia-500 text-white font-black text-xs shadow-lg shadow-pink-500/30 flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
             >
               {isProcessing ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                  <span>Processing Deposit...</span>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Syncing with Wallet...</span>
                 </>
               ) : (
                 <>
-                  <span>Confirm Deposit of ${finalAmount.toFixed(2)}</span>
+                  <span>CONFIRM TOP UP (${finalAmount.toFixed(2)})</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

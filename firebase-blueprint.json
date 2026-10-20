@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with balance and account status",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 1024 },
+        "balance": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "BoostOrder": {
+      "title": "BoostOrder",
+      "description": "Social media boost order placed via SMM panel",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "apiOrderId": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 256 },
+        "serviceId": { "type": "string", "maxLength": 64 },
+        "serviceName": { "type": "string", "maxLength": 256 },
+        "platform": { "type": "string", "maxLength": 64 },
+        "link": { "type": "string", "maxLength": 2048 },
+        "quantity": { "type": "number" },
+        "charge": { "type": "number" },
+        "status": { "type": "string", "maxLength": 64 },
+        "startCount": { "type": "number" },
+        "remains": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 16 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["userId", "serviceId", "link", "quantity", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile data keyed by user auth UID"
+    },
+    "/orders/{orderId}": {
+      "schema": "BoostOrder",
+      "description": "Boost orders placed by authenticated users"
+    }
+  }
+}

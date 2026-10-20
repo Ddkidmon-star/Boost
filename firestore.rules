@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global default-deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isOwnerAdmin() {
+      return isSignedIn() && request.auth.token.email != null && request.auth.token.email.lower() == 'preciousddkid@gmail.com';
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isOwnerAdmin());
+      allow list: if isOwnerAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId
+        && request.resource.data.keys().hasAll(['uid', 'email', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isOwnerAdmin())
+        && request.resource.data.uid == resource.data.uid;
+      allow delete: if isOwnerAdmin();
+    }
+
+    // Boost Orders collection
+    match /orders/{orderId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isOwnerAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isOwnerAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['userId', 'serviceId', 'link', 'quantity', 'status', 'createdAt']);
+      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isOwnerAdmin());
+      allow delete: if isOwnerAdmin();
+    }
+  }
+}

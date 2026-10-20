@@ -191,7 +191,9 @@ export class SMMClient {
     platform: SocialPlatform,
     serviceName: string,
     rate: string,
-    isOwner: boolean
+    isOwner: boolean,
+    userId?: string,
+    userEmail?: string
   ): Promise<BoostOrder> {
     const charge = calculateOrderCost(rate, quantity, isOwner);
     let apiOrderId: string | number = Math.floor(100000 + Math.random() * 900000);
@@ -224,6 +226,8 @@ export class SMMClient {
     const newOrder: BoostOrder = {
       id: `ord_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       apiOrderId,
+      userId: userId || 'anonymous',
+      userEmail: userEmail || '',
       serviceId,
       serviceName,
       platform,

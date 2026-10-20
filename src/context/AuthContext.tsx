@@ -1,170 +1,107 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile } from '../types';
 import { 
+  auth, 
+  signInWithGoogle, 
+  signOut, 
+  syncUserProfile, 
+  updateUserBalanceInDb, 
   isOwnerEmail, 
-  loginWithGoogleRedirect, 
-  logoutUser, 
-  subscribeToAuth, 
-  checkRedirectAuth, 
+  testFirestoreConnection,
   OWNER_EMAIL 
 } from '../services/firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 interface AuthContextType {
   user: UserProfile | null;
+  firebaseUser: FirebaseUser | null;
   isOwner: boolean;
   isLoading: boolean;
   loginWithGoogle: () => Promise<void>;
-  loginAsOwnerDemo: () => void;
-  loginAsCustomerDemo: (email?: string, name?: string) => void;
   logout: () => Promise<void>;
-  topUpWallet: (amount: number) => void;
-  deductBalance: (amount: number) => boolean;
+  topUpWallet: (amount: number) => Promise<void>;
+  deductBalance: (amount: number) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const STORAGE_KEY_USER = 'smm_boost_current_user';
-const STORAGE_KEY_WALLET_PREFIX = 'smm_wallet_balance_';
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Helper to load wallet balance for non-owner
-  const getWalletBalance = (email: string): number => {
-    if (isOwnerEmail(email)) return Infinity;
-    const saved = localStorage.getItem(`${STORAGE_KEY_WALLET_PREFIX}${email.toLowerCase()}`);
-    return saved !== null ? parseFloat(saved) : 25.00; // Default $25 for new test accounts
-  };
-
-  const saveWalletBalance = (email: string, balance: number) => {
-    if (isOwnerEmail(email)) return;
-    localStorage.setItem(`${STORAGE_KEY_WALLET_PREFIX}${email.toLowerCase()}`, balance.toFixed(2));
-  };
-
-  // Build profile object with silent owner classification
-  const buildUserProfile = (email: string, displayName?: string, photoURL?: string, uid?: string): UserProfile => {
-    const isOwner = isOwnerEmail(email);
-    const balance = isOwner ? Infinity : getWalletBalance(email);
-
-    return {
-      uid: uid || `usr_${Date.now()}`,
-      email,
-      displayName: displayName || (isOwner ? 'Precious' : email.split('@')[0]),
-      photoURL: photoURL || (isOwner 
-        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80' 
-        : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'),
-      isOwner,
-      balance,
-      createdAt: new Date().toISOString(),
-    };
-  };
-
   useEffect(() => {
-    // 1. Check local session first
-    const savedUser = localStorage.getItem(STORAGE_KEY_USER);
-    if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        const refreshed = buildUserProfile(parsed.email, parsed.displayName, parsed.photoURL, parsed.uid);
-        setUser(refreshed);
-      } catch {
-        // Fall back
-      }
-    } else {
-      // By default, start with the App Owner automatically signed in or ready to boost!
-      const initialOwner = buildUserProfile(OWNER_EMAIL, 'Precious', undefined, 'owner-precious-root');
-      setUser(initialOwner);
-      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(initialOwner));
-    }
+    // Validate connection to Firestore on boot
+    testFirestoreConnection().catch((e) => console.warn('Init firestore test:', e));
 
-    // 2. Check Firebase Redirect result
-    checkRedirectAuth().then((firebaseUser) => {
-      if (firebaseUser?.email) {
-        const profile = buildUserProfile(
-          firebaseUser.email,
-          firebaseUser.displayName || undefined,
-          firebaseUser.photoURL || undefined,
-          firebaseUser.uid
-        );
-        setUser(profile);
-        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(profile));
-      }
-    });
-
-    // 3. Listen to Firebase auth state changes
-    const unsubscribe = subscribeToAuth((firebaseUser) => {
-      if (firebaseUser?.email) {
-        const profile = buildUserProfile(
-          firebaseUser.email,
-          firebaseUser.displayName || undefined,
-          firebaseUser.photoURL || undefined,
-          firebaseUser.uid
-        );
-        setUser(profile);
-        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(profile));
+    // Listen to real Firebase Auth state
+    const unsubscribe = onAuthStateChanged(auth, async (currentFirebaseUser) => {
+      setIsLoading(true);
+      if (currentFirebaseUser) {
+        setFirebaseUser(currentFirebaseUser);
+        try {
+          const profile = await syncUserProfile(currentFirebaseUser);
+          setUser(profile);
+        } catch (err) {
+          console.warn('Profile sync fallback:', err);
+          const isOwner = isOwnerEmail(currentFirebaseUser.email);
+          setUser({
+            uid: currentFirebaseUser.uid,
+            email: currentFirebaseUser.email || '',
+            displayName: currentFirebaseUser.displayName || (isOwner ? 'Precious' : 'User'),
+            photoURL: currentFirebaseUser.photoURL || undefined,
+            isOwner,
+            balance: isOwner ? Infinity : 20.00,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      } else {
+        setFirebaseUser(null);
+        setUser(null);
       }
       setIsLoading(false);
     });
 
-    setIsLoading(false);
     return () => unsubscribe();
   }, []);
 
   const loginWithGoogle = async () => {
     setIsLoading(true);
     try {
-      await loginWithGoogleRedirect();
-    } catch (e) {
-      console.warn('Google sign in error, activating simulated Google Sign-In:', e);
-      // Seamless interactive fallback
-      loginAsOwnerDemo();
+      const fbUser = await signInWithGoogle();
+      setFirebaseUser(fbUser);
+      const profile = await syncUserProfile(fbUser);
+      setUser(profile);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loginAsOwnerDemo = () => {
-    const ownerProfile = buildUserProfile(
-      OWNER_EMAIL,
-      'Precious',
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      'owner-precious-1'
-    );
-    setUser(ownerProfile);
-    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(ownerProfile));
-  };
-
-  const loginAsCustomerDemo = (customEmail?: string, customName?: string) => {
-    const email = customEmail || 'alex.creator@gmail.com';
-    const name = customName || 'Alex Rivers';
-    const customerProfile = buildUserProfile(
-      email,
-      name,
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-      `cust_${Date.now()}`
-    );
-    setUser(customerProfile);
-    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(customerProfile));
-  };
-
   const logout = async () => {
-    await logoutUser();
-    setUser(null);
-    localStorage.removeItem(STORAGE_KEY_USER);
+    setIsLoading(true);
+    try {
+      await signOut();
+      setFirebaseUser(null);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const topUpWallet = (amount: number) => {
-    if (!user || user.isOwner) return; // Owner needs no top up
+  const topUpWallet = async (amount: number) => {
+    if (!user || user.isOwner) return; // Owner never needs to top up
     const newBal = (user.balance || 0) + amount;
-    const updated = { ...user, balance: newBal };
-    setUser(updated);
-    saveWalletBalance(user.email, newBal);
+    setUser({ ...user, balance: newBal });
+    try {
+      await updateUserBalanceInDb(user.uid, newBal);
+    } catch (e) {
+      console.warn('Error saving balance to Firestore:', e);
+    }
   };
 
-  const deductBalance = (amount: number): boolean => {
+  const deductBalance = async (amount: number): Promise<boolean> => {
     if (!user) return false;
-    // CRITICAL: Owner is never charged!
+    // CRITICAL: Owner is NEVER charged!
     if (user.isOwner) return true;
 
     if (user.balance < amount) {
@@ -172,9 +109,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const newBal = user.balance - amount;
-    const updated = { ...user, balance: newBal };
-    setUser(updated);
-    saveWalletBalance(user.email, newBal);
+    setUser({ ...user, balance: newBal });
+    try {
+      await updateUserBalanceInDb(user.uid, newBal);
+    } catch (e) {
+      console.warn('Error deducting balance in Firestore:', e);
+    }
     return true;
   };
 
@@ -182,11 +122,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
+        firebaseUser,
         isOwner: Boolean(user?.isOwner),
         isLoading,
         loginWithGoogle,
-        loginAsOwnerDemo,
-        loginAsCustomerDemo,
         logout,
         topUpWallet,
         deductBalance,
